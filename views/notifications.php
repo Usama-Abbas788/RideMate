@@ -38,8 +38,8 @@ require_once __DIR__ . '/layouts/header.php';
         <h1 class="page-title">Notifications</h1>
         <p class="page-subtitle">Manage your recent RideMate alerts.</p>
       </div>
-      <form action="/ridemate/actions/notification_mark_all.php" method="POST" style="margin:0;">
-        <button type="submit" class="btn btn-outline">Mark all as read</button>
+      <form action="/ridemate/actions/notification_mark_all.php" method="POST" style="margin:0; margin-right:1rem;" onsubmit="return confirm('Clear all notifications for this account?');">
+        <button type="submit" class="btn btn-danger">Clear</button>
       </form>
     </div>
 
@@ -54,7 +54,7 @@ require_once __DIR__ . '/layouts/header.php';
             <?php if (!$notification['is_read']): ?>
               <form action="/ridemate/actions/notification_mark_read.php" method="POST" style="margin:0;">
                 <input type="hidden" name="notification_id" value="<?= $notification['id'] ?>">
-                <button type="submit" class="btn btn-sm btn-primary">Mark read</button>
+                <button type="submit" class="btn btn-sm btn-primary">Mark as Read</button>
               </form>
             <?php endif; ?>
           </div>

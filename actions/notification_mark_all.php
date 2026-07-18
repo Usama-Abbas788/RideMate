@@ -9,7 +9,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 $notificationController = new NotificationController($conn);
-$notificationController->markAllRead($_SESSION['user_id']);
+$notificationController->deleteAll($_SESSION['user_id']);
 
 header('Location: /ridemate/views/notifications.php');
 exit;

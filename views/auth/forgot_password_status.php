@@ -5,17 +5,18 @@ if (isset($_SESSION['user_id'])) {
     exit;
 }
 
-if (isset($_SESSION['otp_phone']) && isset($_SESSION['otp_purpose']) && $_SESSION['otp_purpose'] === 'forgot_password') {
-    header('Location: /ridemate/views/auth/verify_otp.php');
+$email = $_SESSION['reset_email'] ?? null;
+$remainingCooldown = max(0, intval($_SESSION['password_reset_resend_at'] ?? 0) - time());
+
+if (!$email) {
+    header('Location: /ridemate/views/auth/forgot_password.php');
     exit;
 }
-
-header('Location: /ridemate/views/auth/forgot_password.php');
-exit;
 
 $pageTitle = 'Password Reset Link Sent';
 $metaDesc  = 'A password reset link has been sent to your email.';
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>

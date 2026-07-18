@@ -12,8 +12,10 @@ if ($_SESSION['user_role'] !== 'admin') {
 
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/../controllers/AdminController.php';
+require_once __DIR__ . '/../controllers/NotificationController.php';
 
 $adminController = new AdminController($conn);
+$notificationController = new NotificationController($conn);
 $data = $adminController->getDashboardData();
 
 $totalUsers      = $data['totalUsers'];
@@ -29,6 +31,7 @@ $monthlyReport  = $data['monthlyReport'];
 $allUsers    = $data['allUsers'];
 $allRides    = $data['allRides'];
 $allBookings = $data['allBookings'];
+$latestAdminNotifications = $notificationController->fetchForUser($_SESSION['user_id']);
 
 $pageTitle = 'Admin Dashboard';
 $metaDesc  = 'RideMate Admin — Manage users, rides, and bookings.';
@@ -165,6 +168,41 @@ require_once __DIR__ . '/../views/layouts/header.php';
       </a>
     </div>
 
+    <!-- <div id="notifications" style="margin-bottom:2.5rem;">
+      <div class="page-header">
+        <h2 class="page-title" style="font-size:1.35rem;">Recent Admin Notifications</h2>
+        <p style="margin:0.5rem 0 0; color:var(--gray-600);">Latest ride and booking events for admin review.</p>
+      </div>
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Notification</th>
+              <th>Date</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <?php if (!empty($latestAdminNotifications)): ?>
+              <?php foreach ($latestAdminNotifications as $idx => $note): ?>
+                <tr>
+                  <td style="color:var(--gray-500);font-size:0.82rem;">#<?= $idx + 1 ?></td>
+                  <td style="font-weight:600; width:60%;"><?= htmlspecialchars($note['message']) ?></td>
+                  <td style="color:var(--gray-500);font-size:0.85rem;"><?= date('M j, Y · g:i A', strtotime($note['created_at'])) ?></td>
+                  <td><span class="badge badge-<?= $note['is_read'] ? 'success' : 'warning' ?>"><?= $note['is_read'] ? 'Read' : 'Unread' ?></span></td>
+                </tr>
+              <?php endforeach; ?>
+            <?php else: ?>
+              <tr>
+                <td colspan="4" style="text-align:center; color:var(--gray-600);">No admin notifications yet.</td>
+              </tr>
+            <?php endif; ?>
+          </tbody>
+        </table>
+      </div>
+    </div> -->
+
     <div id="users" style="margin-bottom:2.5rem;">
       <div class="page-header">
         <h2 class="page-title" style="font-size:1.35rem;">All Users (<?= $totalUsers ?>)</h2>
@@ -234,7 +272,8 @@ require_once __DIR__ . '/../views/layouts/header.php';
               <tr>
                 <td style="color:var(--gray-500);font-size:0.82rem;">#<?= $r['id'] ?></td>
                 <td>
-                  <?= htmlspecialchars($r['driver_name']) ?>
+                  <div style="font-weight:600;"><?= htmlspecialchars($r['driver_name']) ?></div>
+                  <div style="color:var(--gray-500);font-size:0.85rem;"><?= htmlspecialchars($r['driver_phone']) ?></div>
                 </td>
                 <td>
                   <div style="font-weight:600;"><?= htmlspecialchars($r['origin']) ?></div>
@@ -266,6 +305,7 @@ require_once __DIR__ . '/../views/layouts/header.php';
             <tr>
               <th>#</th>
               <th>Passenger</th>
+              <th>Driver</th>
               <th>Route</th>
               <th>Date</th>
               <th>Status</th>
@@ -276,13 +316,26 @@ require_once __DIR__ . '/../views/layouts/header.php';
             <?php foreach ($allBookings as $b): ?>
               <tr>
                 <td style="color:var(--gray-500);font-size:0.82rem;">#<?= $b['id'] ?></td>
-                <td style="font-weight:600;"><?= htmlspecialchars($b['passenger_name']) ?></td>
+                <td>
+                  <div style="font-weight:600;"><?= htmlspecialchars($b['passenger_name']) ?></div>
+                  <div style="color:var(--gray-500);font-size:0.85rem;"><?= htmlspecialchars($b['passenger_phone']) ?></div>
+                </td>
+                <td>
+                  <div style="font-weight:600;"><?= htmlspecialchars($b['driver_name']) ?></div>
+                  <div style="color:var(--gray-500);font-size:0.85rem;"><?= htmlspecialchars($b['driver_phone']) ?></div>
+                </td>
                 <td>
                   <div><?= htmlspecialchars($b['origin']) ?></div>
                   <div style="color:var(--gray-500);font-size:0.82rem;">→ <?= htmlspecialchars($b['destination']) ?></div>
                 </td>
+                <?php
+                  $displayStatus = $b['status'];
+                  if (strtotime($b['date']) < time() && !in_array($b['status'], ['cancelled', 'closed', 'rejected'])) {
+                      $displayStatus = 'expired';
+                  }
+                ?>
                 <td style="font-size:0.85rem;"><?= date('M j, Y', strtotime($b['date'])) ?></td>
-                <td><span class="badge badge-<?= $b['status'] ?>"><?= ucfirst($b['status']) ?></span></td>
+                <td><span class="badge badge-<?= $displayStatus ?>"><?= ucfirst($displayStatus) ?></span></td>
                 <td style="color:var(--gray-500);font-size:0.85rem;"><?= date('M j, Y', strtotime($b['created_at'])) ?></td>
               </tr>
             <?php endforeach; ?>

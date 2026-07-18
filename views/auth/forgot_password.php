@@ -4,12 +4,8 @@ if (isset($_SESSION['user_id'])) {
     header('Location: /ridemate/index.php');
     exit;
 }
-if (isset($_SESSION['otp_phone']) && isset($_SESSION['otp_purpose']) && $_SESSION['otp_purpose'] === 'forgot_password') {
-    header('Location: /ridemate/views/auth/verify_otp.php');
-    exit;
-}
 $pageTitle = 'Forgot Password';
-$metaDesc  = 'Reset your RideMate password with a phone OTP.';
+$metaDesc  = 'Reset your RideMate password with email.';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -46,20 +42,20 @@ $metaDesc  = 'Reset your RideMate password with a phone OTP.';
     <?php endif; ?>
 
     <p style="color:rgba(255,255,255,0.7); text-align:center; margin-bottom:1.5rem; font-size:0.95rem;">
-      Enter your registered phone number and we'll send you an OTP to reset your password.
+      Enter your registered email address and we'll send you a password reset link.
     </p>
 
     <form action="/ridemate/actions/forgot_password.php" method="POST" id="forgot-password-form">
       <div class="form-group" style="margin-bottom:1.5rem;">
-        <label>Phone Number</label>
+        <label>Email Address</label>
         <input 
-          type="tel" 
-          name="phone" 
-          id="forgot-phone"
+          type="email" 
+          name="email" 
+          id="forgot-email"
           class="form-control" 
-          placeholder="Enter your phone number" 
+          placeholder="Enter your email address" 
           required 
-          autocomplete="tel" 
+          autocomplete="email" 
         />
       </div>
       <button type="submit" class="btn btn-primary w-100 btn-lg" id="forgot-submit-btn">

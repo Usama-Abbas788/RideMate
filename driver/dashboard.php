@@ -178,6 +178,11 @@ require_once __DIR__ . '/../views/layouts/header.php';
               </p>
             <?php else: ?>
               <?php foreach ($bookings as $booking): ?>
+                <?php
+                  $isExpired = isset($booking['date']) && strtotime($booking['date']) < time() && !in_array($booking['status'], ['cancelled', 'closed', 'rejected']);
+                  $displayStatus = $isExpired ? 'expired' : $booking['status'];
+                  $bookingDateLabel = isset($booking['created_at']) ? date('M j', strtotime($booking['created_at'])) : '';
+                ?>
                 <div class="booking-card">
                   <div class="booking-card-header">
                     <div class="booking-passenger-info">
@@ -190,29 +195,34 @@ require_once __DIR__ . '/../views/layouts/header.php';
                       </div>
                     </div>
                     <div style="display:flex;align-items:center;gap:0.75rem;">
-                      <span class="badge badge-<?= $booking['status'] ?>"><?= ucfirst($booking['status']) ?></span>
-                      <span style="color:rgba(255,255,255,0.4);font-size:0.78rem;"><?= date('M j', strtotime($booking['created_at'])) ?></span>
+                      <span class="badge badge-<?= $displayStatus ?>"><?= ucfirst($displayStatus) ?></span>
+                      <span style="color:rgba(255,255,255,0.4);font-size:0.78rem;"><?= htmlspecialchars($bookingDateLabel) ?></span>
                     </div>
                   </div>
 
-                  <?php if ($booking['status'] === 'pending'): ?>
-                  <div class="booking-card-body" style="display:flex;gap:0.75rem;justify-content:flex-end;">
-                    <form action="/ridemate/actions/update_booking.php" method="POST" style="margin:0;">
-                      <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>" />
-                      <input type="hidden" name="status" value="accepted" />
-                      <button type="submit" class="btn btn-success btn-sm" id="btn-accept-<?= $booking['id'] ?>">
-                        ✅ Accept
-                      </button>
-                    </form>
-                    <form action="/ridemate/actions/update_booking.php" method="POST" style="margin:0;">
-                      <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>" />
-                      <input type="hidden" name="status" value="rejected" />
-                      <button type="submit" class="btn btn-danger btn-sm" id="btn-reject-<?= $booking['id'] ?>">
-                        ✕ Reject
-                      </button>
-                    </form>
-                  </div>
-                  <?php endif; ?>
+            <div class="booking-card-footer" style="display:flex;gap:0.75rem;justify-content:flex-end;flex-wrap:wrap;">
+              <?php if ($booking['status'] === 'pending' && !$isExpired): ?>
+                <form action="/ridemate/actions/update_booking.php" method="POST" style="margin:0;">
+                  <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>" />
+                  <input type="hidden" name="status" value="accepted" />
+                  <button type="submit" class="btn btn-success btn-sm" id="btn-accept-<?= $booking['id'] ?>">
+                    ✅ Accept
+                  </button>
+                </form>
+                <form action="/ridemate/actions/update_booking.php" method="POST" style="margin:0;">
+                  <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>" />
+                  <input type="hidden" name="status" value="rejected" />
+                  <button type="submit" class="btn btn-danger btn-sm" id="btn-reject-<?= $booking['id'] ?>">
+                    ✕ Reject
+                  </button>
+                </form>
+              <?php endif; ?>
+            </div>
+            <?php if ($isExpired): ?>
+              <div style="margin-top:0.75rem; color:var(--red); font-size:0.9rem;">
+                ⚠️ This booking is now expired because the ride date has passed.
+              </div>
+            <?php endif; ?>
                 </div>
               <?php endforeach; ?>
             <?php endif; ?>

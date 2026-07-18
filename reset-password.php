@@ -5,13 +5,13 @@ if (isset($_SESSION['user_id'])) {
     exit;
 }
 
-if (empty($_SESSION['reset_phone'])) {
-    $_SESSION['error'] = 'Reset session expired. Please request a new OTP.';
+$token = trim($_GET['token'] ?? '');
+if (empty($token)) {
+    $_SESSION['error'] = 'Invalid password reset link.';
     header('Location: /ridemate/views/auth/forgot_password.php');
     exit;
 }
 
-$phone = htmlspecialchars($_SESSION['reset_phone'], ENT_QUOTES);
 $pageTitle = 'Reset Password';
 $metaDesc  = 'Set a new password for your RideMate account.';
 ?>
@@ -42,9 +42,10 @@ $metaDesc  = 'Set a new password for your RideMate account.';
     <?php endif; ?>
 
     <p style="color:rgba(255,255,255,0.75); text-align:center; margin-bottom:1.2rem;">
-      Resetting password for <strong><?= $phone ?></strong>.
+      Enter a new password for your RideMate account.
     </p>
     <form action="/ridemate/actions/reset_password.php" method="POST">
+      <input type="hidden" name="reset_token" value="<?= htmlspecialchars($token, ENT_QUOTES) ?>" />
       <div class="form-group" style="margin-bottom:1rem;">
         <label>New Password</label>
         <input type="password" name="password" class="form-control" placeholder="Enter new password" required minlength="6" />

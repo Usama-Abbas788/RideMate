@@ -72,16 +72,6 @@ $metaDesc  = 'Resend your RideMate verification email.';
         }, 500);
       </script>
     <?php endif; ?>
-      <div class="form-group" style="margin-bottom:1rem;">
-        <label>Email Address</label>
-        <input type="email" name="email" class="form-control" placeholder="Enter your email" required autocomplete="email" />
-      </div>
-      <button type="submit" class="btn btn-primary w-100">Resend Verification Email</button>
-    </form>
-
-    <div class="auth-footer" style="margin-top:1rem;">
-      Already verified? <a href="/ridemate/views/auth/login.php">Login</a>
-    </div>
   </div>
 </main>
 </body>

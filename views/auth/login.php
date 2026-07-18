@@ -56,15 +56,15 @@ $metaDesc  = 'Login to RideMate — Your university ride sharing platform.';
 
     <form action="/ridemate/actions/login.php" method="POST" id="login-form">
       <div class="form-group" style="margin-bottom:1.1rem;">
-        <label>Phone Number</label>
+        <label>Email Address</label>
         <input
-          type="tel"
-          name="phone"
-          id="login-phone"
+          type="email"
+          name="email"
+          id="login-email"
           class="form-control"
-          placeholder="Enter your phone number"
+          placeholder="Enter your email address"
           required
-          autocomplete="tel"
+          autocomplete="email"
         />
       </div>
 

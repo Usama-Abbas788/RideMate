@@ -23,14 +23,12 @@ $isLoggedIn    = isset($_SESSION['user_id']);
 $userId        = $_SESSION['user_id']   ?? null;
 $userRole      = $_SESSION['user_role'] ?? '';
 $isDriver      = ($ride['driver_id'] == $userId);
-$alreadyBooked = $isLoggedIn ? $bookingController->getRideBookings($rideId) : [];
+$bookingStatus = null;
+$userBooking   = null;
 
-// Check if current user already booked
-$userBooked = false;
 if ($isLoggedIn && $userRole === 'passenger') {
-    require_once __DIR__ . '/../../models/Booking.php';
-    $bookingModel = new Booking($conn);
-    $userBooked   = $bookingModel->alreadyBooked($rideId, $userId);
+    $userBooking = $bookingController->getPassengerBookingForRide($rideId, $userId);
+    $bookingStatus = $userBooking['status'] ?? null;
 }
 
 $pageTitle    = htmlspecialchars($ride['origin']) . ' → ' . htmlspecialchars($ride['destination']);
@@ -151,7 +149,15 @@ require_once __DIR__ . '/../../views/layouts/header.php';
             </div>
             <div style="color:var(--gray-500);font-size:0.85rem;margin-bottom:1.5rem;">per seat</div>
 
-            <?php if (!$isLoggedIn): ?>
+            <?php if (strtotime($ride['date']) < time()): ?>
+              <div class="badge badge-expired" style="padding:0.6rem 1rem;font-size:0.88rem;display:block;text-align:center;">
+                ⌛ Ride Expired
+              </div>
+              <div style="color:var(--gray-400);font-size:0.8rem;margin-top:0.75rem;">
+                This ride is no longer bookable because the departure time has passed.
+              </div>
+
+            <?php elseif (!$isLoggedIn): ?>
               <a href="/ridemate/views/auth/login.php" class="btn btn-primary w-100 btn-lg" id="btn-login-to-book">
                 Login to Book
               </a>
@@ -164,12 +170,35 @@ require_once __DIR__ . '/../../views/layouts/header.php';
                 This is your ride
               </div>
 
-            <?php elseif ($userBooked): ?>
-              <div class="badge badge-accepted" style="padding:0.6rem 1rem;font-size:0.88rem;display:block;text-align:center;">
-                ✅ Already Booked
+            <?php elseif (strtotime($ride['date']) < time()): ?>
+              <div class="badge badge-expired" style="padding:0.6rem 1rem;font-size:0.88rem;display:block;text-align:center;">
+                ⌛ Ride Expired
               </div>
               <div style="color:var(--gray-400);font-size:0.8rem;margin-top:0.75rem;">
-                Check your dashboard for status.
+                This ride is no longer bookable because the departure time has passed.
+              </div>
+
+            <?php elseif ($userBooking): ?>
+              <?php
+                $statusLabel = 'Booking';
+                $badgeClass = 'badge-' . $bookingStatus;
+                if ($bookingStatus === 'accepted') {
+                    $statusLabel = 'Booking Accepted';
+                } elseif ($bookingStatus === 'pending') {
+                    $statusLabel = 'Booking Pending';
+                } elseif ($bookingStatus === 'rejected') {
+                    $statusLabel = 'Booking Rejected';
+                } elseif ($bookingStatus === 'cancelled') {
+                    $statusLabel = 'Booking Cancelled';
+                } elseif ($bookingStatus === 'closed') {
+                    $statusLabel = 'Completed';
+                }
+              ?>
+              <div class="badge <?= htmlspecialchars($badgeClass) ?>" style="padding:0.6rem 1rem;font-size:0.88rem;display:block;text-align:center;">
+                <?= htmlspecialchars($statusLabel) ?>
+              </div>
+              <div style="color:var(--gray-400);font-size:0.8rem;margin-top:0.75rem;">
+                Check your dashboard for details.
               </div>
 
             <?php elseif ($ride['seats'] <= 0): ?>

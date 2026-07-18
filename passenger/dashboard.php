@@ -31,6 +31,11 @@ require_once __DIR__ . '/../views/layouts/header.php';
         <?= defaultAvatarIcon() ?>
       </div>
       <div class="sidebar-name"><?= htmlspecialchars($user['name']) ?></div>
+      <?php if (!empty($user['phone'])): ?>
+        <div class="sidebar-phone" style="color:rgba(255,255,255,0.75);font-size:0.92rem;margin-top:0.4rem;">
+          📱 <?= htmlspecialchars($user['phone']) ?>
+        </div>
+      <?php endif; ?>
       <span class="badge badge-passenger">🎒 Passenger</span>
     </div>
 
@@ -78,12 +83,20 @@ require_once __DIR__ . '/../views/layouts/header.php';
       $acceptedCount  = 0;
       $rejectedCount  = 0;
       $cancelledCount = 0;
+      $closedCount    = 0;
+      $expiredCount   = 0;
       foreach ($bookings as $b) {
-          switch($b['status']) {
+          $displayStatus = $b['status'];
+          if (strtotime($b['date']) < time() && !in_array($b['status'], ['cancelled', 'closed', 'rejected'])) {
+              $displayStatus = 'expired';
+          }
+          switch($displayStatus) {
               case 'pending':   $pendingCount++; break;
               case 'accepted':  $acceptedCount++; break;
               case 'rejected':  $rejectedCount++; break;
               case 'cancelled': $cancelledCount++; break;
+              case 'closed':    $closedCount++; break;
+              case 'expired':   $expiredCount++; break;
           }
       }
     ?>
@@ -116,6 +129,20 @@ require_once __DIR__ . '/../views/layouts/header.php';
           <div class="stat-label">Cancelled</div>
         </div>
       </div>
+      <div class="stat-card">
+        <div class="stat-icon green">🏁</div>
+        <div>
+          <div class="stat-value"><?= $closedCount ?></div>
+          <div class="stat-label">Completed</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon purple">⌛</div>
+        <div>
+          <div class="stat-value"><?= $expiredCount ?></div>
+          <div class="stat-label">Expired</div>
+        </div>
+      </div>
     </div>
 
     <!-- Bookings List -->
@@ -134,6 +161,8 @@ require_once __DIR__ . '/../views/layouts/header.php';
         <?php
           $vehicleIcon  = $booking['vehicle_type'] === 'car' ? '🚗' : '🏍️';
           $driverInitial = strtoupper(substr($booking['driver_name'], 0, 1));
+          $isExpired = strtotime($booking['date']) < time() && !in_array($booking['status'], ['cancelled', 'closed', 'rejected']);
+          $displayStatus = $isExpired ? 'expired' : $booking['status'];
         ?>
         <div class="booking-card" style="margin-bottom:1.25rem;">
 
@@ -148,7 +177,7 @@ require_once __DIR__ . '/../views/layouts/header.php';
                 📅 <?= date('D, M j, Y · g:i A', strtotime($booking['date'])) ?>
               </div>
             </div>
-            <span class="badge badge-<?= $booking['status'] ?>"><?= ucfirst($booking['status']) ?></span>
+            <span class="badge badge-<?= $displayStatus ?>"><?= ucfirst($displayStatus) ?></span>
           </div>
 
           <!-- Booking Body -->
@@ -160,8 +189,10 @@ require_once __DIR__ . '/../views/layouts/header.php';
                 <div style="width:44px;height:44px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:1rem;flex-shrink:0;">
                   <?= $driverInitial ?>
                 </div>
+
                 <div>
                   <div style="font-weight:600;color:var(--gray-800);"><?= htmlspecialchars($booking['driver_name']) ?></div>
+                  <div style="color:var(--gray-500);font-size:0.8rem;"><?= htmlspecialchars($booking['driver_phone']) ?></div>
                   <div style="color:var(--gray-500);font-size:0.8rem;">Driver</div>
                 </div>
               </div>
@@ -173,9 +204,16 @@ require_once __DIR__ . '/../views/layouts/header.php';
                   <span style="font-size:0.8rem;color:var(--gray-400);font-weight:400;font-family:var(--font-body);">/seat</span>
                 </div>
 
-                <?php if ($booking['status'] === 'pending' || $booking['status'] === 'accepted'): ?>
-                  <form action="/ridemate/actions/cancel_booking.php" method="POST"
-                        onsubmit="return confirm('Cancel this booking?');">
+<?php
+              $displayStatus = $booking['status'];
+              $isExpired = strtotime($booking['date']) < time() && !in_array($booking['status'], ['cancelled', 'closed', 'rejected']);
+              if ($isExpired) {
+                  $displayStatus = 'expired';
+              }
+            ?>
+            <?php if (in_array($booking['status'], ['pending', 'accepted']) && !$isExpired): ?>
+              <form action="/ridemate/actions/cancel_booking.php" method="POST"
+                    onsubmit="return confirm('Cancel this booking?');" style="margin:0;">
                     <input type="hidden" name="booking_id" value="<?= $booking['id'] ?>" />
                     <button type="submit" class="btn btn-danger btn-sm" id="btn-cancel-booking-<?= $booking['id'] ?>">
                       Cancel
@@ -188,6 +226,11 @@ require_once __DIR__ . '/../views/layouts/header.php';
               </div>
 
             </div>
+            <?php if ($isExpired): ?>
+              <div style="margin-top:0.75rem; color:var(--red); font-size:0.9rem;">
+                ⚠️ This booking is now expired because the ride date has passed.
+              </div>
+            <?php endif; ?>
           </div>
         </div>
       <?php endforeach; ?>

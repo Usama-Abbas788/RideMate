@@ -123,6 +123,7 @@ require_once __DIR__ . '/../../views/layouts/header.php';
             $driverInitial = strtoupper(substr($ride['driver_name'], 0, 1));
             $vehicleIcon   = $ride['vehicle_type'] === 'car' ? '🚗' : '🏍️';
             $rideDate      = date('D, M j · g:i A', strtotime($ride['date']));
+            $rideExpired   = strtotime($ride['date']) < time();
           ?>
           <div class="ride-card">
             <!-- Card Header with driver info -->
@@ -168,13 +169,18 @@ require_once __DIR__ . '/../../views/layouts/header.php';
 
             <!-- Footer with CTA -->
             <div class="ride-card-footer">
-              <span style="color:var(--gray-500);font-size:0.82rem;">
-                Posted <?= date('M j', strtotime($ride['created_at'])) ?>
-              </span>
+              <div>
+                <span style="color:var(--gray-500);font-size:0.82rem;">
+                  Posted <?= date('M j', strtotime($ride['created_at'])) ?>
+                </span>
+                <?php if ($rideExpired): ?>
+                  <span class="badge badge-expired" style="margin-left:0.75rem;">Expired</span>
+                <?php endif; ?>
+              </div>
               <a href="/ridemate/views/rides/detail.php?id=<?= $ride['id'] ?>"
                  class="btn btn-primary btn-sm"
                  id="btn-view-ride-<?= $ride['id'] ?>">
-                View & Book →
+                <?= $rideExpired ? 'View Details' : 'View & Book →' ?>
               </a>
             </div>
           </div>

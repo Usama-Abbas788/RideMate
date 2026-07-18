@@ -14,21 +14,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     require_once __DIR__ . '/../config/helpers.php';
     require_once __DIR__ . '/../models/User.php';
 
-    $phone    = normalizePhone(trim($_POST['phone'] ?? ''));
+    $email    = sanitizeEmail(trim($_POST['email'] ?? ''));
     $password = trim($_POST['password'] ?? '');
 
-    if ($phone === '' || $password === '') {
-        $error = 'Please enter both phone number and password.';
-    } elseif (!isValidPhone($phone)) {
-        $error = 'Phone must be in format 0300-1234567 (4 digits-7 digits).';
+    if ($email === '' || $password === '') {
+        $error = 'Please enter both email and password.';
+    } elseif (!isValidEmail($email)) {
+        $error = 'Please enter a valid email address.';
     } else {
         $userModel = new User($conn);
-        $user = $userModel->findByPhoneAndPassword($phone, $password);
+        $user = $userModel->findByEmailAndPassword($email, $password);
 
         if (!$user || $user['role'] !== 'admin') {
             $error = 'Invalid credentials or access denied.';
         } else {
-            // Admins are created manually — no OTP / SMS verification
             unset(
                 $_SESSION['otp_phone'],
                 $_SESSION['otp_purpose'],
@@ -77,7 +76,7 @@ if (!empty($_SESSION['success'])) {
     <div class="admin-access-badge">Restricted access</div>
 
     <div class="auth-title">Admin sign in</div>
-    <div class="auth-subtitle">Enter your administrator phone and password to continue.</div>
+    <div class="auth-subtitle">Enter your administrator email and password to continue.</div>
 
     <?php if ($error): ?>
       <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
@@ -88,21 +87,17 @@ if (!empty($_SESSION['success'])) {
 
     <form action="/ridemate/admin/login.php" method="POST" novalidate>
       <div class="form-group">
-        <label for="admin-phone">Phone Number</label>
+        <label for="admin-email">Email Address</label>
         <input
-          type="tel"
-          id="admin-phone"
-          name="phone"
-          class="form-control phone-input"
-          placeholder="0300-1234567"
-          inputmode="numeric"
-          maxlength="12"
-          pattern="\d{4}-\d{7}"
-          value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>"
+          type="email"
+          id="admin-email"
+          name="email"
+          class="form-control"
+          placeholder="admin@example.com"
+          value="<?= htmlspecialchars($_POST['email'] ?? '') ?>"
           required
-          autocomplete="tel"
+          autocomplete="email"
         />
-        <span class="field-hint">Format: 4 digits – 7 digits</span>
       </div>
 
       <div class="form-group form-group-password">

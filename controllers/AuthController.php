@@ -1,7 +1,7 @@
 <?php
 require_once __DIR__ . '/../models/User.php';
 require_once __DIR__ . '/../config/helpers.php';
-require_once __DIR__ . '/../config/twilio.php';
+require_once __DIR__ . '/../config/mail.php';
 
 class AuthController {
     private $userModel;
@@ -13,66 +13,61 @@ class AuthController {
     public function login() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') return;
 
-        $phone    = normalizePhone(trim($_POST['phone']    ?? ''));
+        $email = sanitizeEmail(trim($_POST['email'] ?? ''));
         $password = trim($_POST['password'] ?? '');
 
-        if (empty($phone) || empty($password)) {
+        if (empty($email) || empty($password)) {
             $_SESSION['error'] = 'Please fill in all fields.';
             header('Location: /ridemate/views/auth/login.php');
             exit;
         }
 
-        if (!isValidPhone($phone)) {
-            $_SESSION['error'] = 'Please enter a valid phone number.';
+        if (!isValidEmail($email)) {
+            $_SESSION['error'] = 'Please enter a valid email address.';
             header('Location: /ridemate/views/auth/login.php');
             exit;
         }
 
-        $user = $this->userModel->findByPhoneAndPassword($phone, $password);
-        if (!$user) {
-            $_SESSION['error'] = 'Invalid phone number or password.';
+        $user = $this->userModel->findByEmail($email);
+        if (!$user || !password_verify($password, $user['password'])) {
+            $_SESSION['error'] = 'Invalid email or password.';
             header('Location: /ridemate/views/auth/login.php');
             exit;
         }
 
-        $otpCode = generateOtp();
-        $otpExpires = nowDatetime();
-        $otpExpires = date('Y-m-d H:i:s', strtotime($otpExpires . ' +5 minutes'));
-        if (!$this->userModel->setOtp($phone, $otpCode, $otpExpires)) {
-            $_SESSION['error'] = 'Unable to generate OTP. Please try again.';
+        if (!$user['email_verified']) {
+            $_SESSION['error'] = 'Please verify your email address before logging in.';
             header('Location: /ridemate/views/auth/login.php');
             exit;
         }
 
-        $message = "Your RideMate login OTP is: {$otpCode}. It expires in 5 minutes.";
-        $sent = sendSms($phone, $message);
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['user_name'] = $user['name'];
+        $_SESSION['user_role'] = $user['role'];
 
-        if (!$sent) {
-            $_SESSION['error'] = 'Unable to send OTP SMS. Please try again later.';
-            header('Location: /ridemate/views/auth/login.php');
-            exit;
+        if ($user['role'] === 'admin') {
+            header('Location: /ridemate/admin/dashboard.php');
+        } else {
+            header('Location: /ridemate/index.php');
         }
-
-        $_SESSION['otp_phone'] = $phone;
-        $_SESSION['otp_purpose'] = 'login';
-        $_SESSION['otp_sent_at'] = time();
-        $_SESSION['otp_resend_at'] = time() + 60;
-
-        header('Location: /ridemate/views/auth/verify_otp.php');
         exit;
     }
 
     public function register() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') return;
 
-        $name     = trim($_POST['name']     ?? '');
-        $phone    = normalizePhone(trim($_POST['phone']    ?? ''));
-        $password = trim($_POST['password'] ?? '');
-        $role     = trim($_POST['role']     ?? 'passenger');
+        $name     = trim($_POST['name']         ?? '');
+        $email    = sanitizeEmail(trim($_POST['email'] ?? ''));
+        $phoneRaw = trim($_POST['phone']        ?? '');
+        $phone    = normalizePhone($phoneRaw);
+        $password = trim($_POST['password']     ?? '');
+        $role     = trim($_POST['role']         ?? 'passenger');
 
         $errors = [];
         if (empty($name)) $errors[] = 'Name is required.';
-        if (empty($phone)) $errors[] = 'Phone is required.';
+        if (empty($email)) $errors[] = 'Email is required.';
+        if (!isValidEmail($email)) $errors[] = 'Invalid email address.';
+        if (empty($phoneRaw)) $errors[] = 'Phone number is required.';
         if (!isValidPhone($phone)) $errors[] = 'Invalid phone number format.';
         if (strlen($password) < 6) $errors[] = 'Password must be at least 6 characters.';
         if ($role === 'admin' || !in_array($role, ['driver', 'passenger'])) $errors[] = 'Invalid role selected.';
@@ -83,276 +78,195 @@ class AuthController {
             exit;
         }
 
+        if ($this->userModel->emailExists($email) || $this->userModel->pendingEmailExists($email)) {
+            $_SESSION['error'] = 'Email is already registered or pending verification.';
+            header('Location: /ridemate/views/auth/register.php');
+            exit;
+        }
+
         if ($this->userModel->phoneExists($phone) || $this->userModel->pendingPhoneExists($phone)) {
             $_SESSION['error'] = 'Phone number is already registered or pending verification.';
             header('Location: /ridemate/views/auth/register.php');
             exit;
         }
 
-        $otpCode = generateOtp();
-        $otpExpires = nowDatetime();
-        $otpExpires = date('Y-m-d H:i:s', strtotime($otpExpires . ' +5 minutes'));
+        $verificationToken = generateToken();
+        $verificationExpires = nowDatetime();
+        $verificationExpires = date('Y-m-d H:i:s', strtotime($verificationExpires . ' +15 minutes'));
         $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
-        if (!$this->userModel->registerPending($name, $phone, $hashedPassword, $role, $otpCode, $otpExpires)) {
+
+        if (!$this->userModel->registerPending($name, $email, $hashedPassword, $role, $verificationToken, $verificationExpires, $phone)) {
             $_SESSION['error'] = 'Registration failed. Please try again.';
             header('Location: /ridemate/views/auth/register.php');
             exit;
         }
 
-        $message = "Your RideMate registration OTP is: {$otpCode}. It expires in 5 minutes.";
-        $sent = sendSms($phone, $message);
+        $verificationLink = BASE_URL . '/verify.php?token=' . urlencode($verificationToken);
+        $subject = 'Verify your RideMate email';
+        $body = "<p>Hi " . htmlspecialchars($name) . ",</p>" .
+                "<p>Thank you for registering at RideMate. Please click the link below to verify your email address and activate your account:</p>" .
+                "<p><a href='" . $verificationLink . "'>Verify my email</a></p>" .
+                "<p>If the button does not work, paste this URL into your browser:</p>" .
+                "<p>" . htmlspecialchars($verificationLink) . "</p>" .
+                "<p>This link expires in 15 minutes.</p>";
 
+        $sent = sendMail($email, $name, $subject, $body);
         if (!$sent) {
-            $_SESSION['error'] = 'Registration completed, but we could not send the OTP SMS. Please try again.';
+            $_SESSION['error'] = 'Registration created, but we could not send the verification email. Please try again later.';
             header('Location: /ridemate/views/auth/register.php');
             exit;
         }
 
-        $_SESSION['otp_phone'] = $phone;
-        $_SESSION['otp_purpose'] = 'register';
-        $_SESSION['otp_sent_at'] = time();
-        $_SESSION['otp_resend_at'] = time() + 60;
+        $_SESSION['verification_email'] = $email;
+        $_SESSION['verification_resend_at'] = time() + 60;
+        $_SESSION['success'] = 'A verification email has been sent. Please check your inbox.';
 
-        header('Location: /ridemate/views/auth/verify_otp.php');
+        header('Location: /ridemate/views/auth/verify_status.php');
         exit;
     }
 
-    public function resendOtp() {
+    public function resendVerification() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') return;
 
-        $phone = normalizePhone(trim($_POST['phone'] ?? ''));
-        if (empty($phone) || !isValidPhone($phone)) {
-            $_SESSION['error'] = 'Please enter a valid phone number.';
-            header('Location: /ridemate/views/auth/verify_otp.php');
+        $email = sanitizeEmail(trim($_POST['email'] ?? ''));
+        if (empty($email) || !isValidEmail($email)) {
+            $_SESSION['error'] = 'Please enter a valid email address.';
+            header('Location: /ridemate/views/auth/resend_verification.php');
             exit;
         }
 
-        $cooldown = intval($_SESSION['otp_resend_at'] ?? 0);
-        if ($cooldown > time()) {
-            $remaining = $cooldown - time();
-            $_SESSION['error'] = 'Please wait ' . gmdate('i:s', $remaining) . ' before requesting another OTP.';
-            header('Location: /ridemate/views/auth/verify_otp.php');
+        $pending = $this->userModel->findPendingByEmail($email);
+        if (!$pending) {
+            $_SESSION['error'] = 'No pending registration found for that email.';
+            header('Location: /ridemate/views/auth/resend_verification.php');
             exit;
         }
 
-        $purpose = $_SESSION['otp_purpose'] ?? null;
-        if (!$purpose) {
-            $_SESSION['error'] = 'OTP session expired. Please start again.';
-            header('Location: /ridemate/views/auth/login.php');
+        $verificationToken = generateToken();
+        $verificationExpires = nowDatetime();
+        $verificationExpires = date('Y-m-d H:i:s', strtotime($verificationExpires . ' +15 minutes'));
+
+        if (!$this->userModel->updatePendingVerificationToken($email, $verificationToken, $verificationExpires)) {
+            $_SESSION['error'] = 'Could not refresh verification link. Please try again.';
+            header('Location: /ridemate/views/auth/resend_verification.php');
             exit;
         }
 
-        $otpCode = generateOtp();
-        $otpExpires = nowDatetime();
-        $otpExpires = date('Y-m-d H:i:s', strtotime($otpExpires . ' +5 minutes'));
+        $verificationLink = BASE_URL . '/verify.php?token=' . urlencode($verificationToken);
+        $subject = 'Your RideMate verification link';
+        $body = "<p>Hi " . htmlspecialchars($pending['name']) . ",</p>" .
+                "<p>Use the link below to verify your RideMate email address:</p>" .
+                "<p><a href='" . $verificationLink . "'>Verify my email</a></p>" .
+                "<p>This link expires in 15 minutes.</p>";
 
-        if ($purpose === 'register') {
-            if (!$this->userModel->setOtpForPending($phone, $otpCode, $otpExpires)) {
-                $_SESSION['error'] = 'Unable to generate OTP. Please try again.';
-                header('Location: /ridemate/views/auth/verify_otp.php');
-                exit;
-            }
-        } else {
-            if (!$this->userModel->setOtp($phone, $otpCode, $otpExpires)) {
-                $_SESSION['error'] = 'Unable to generate OTP. Please try again.';
-                header('Location: /ridemate/views/auth/verify_otp.php');
-                exit;
-            }
-        }
-
-        $message = "Your RideMate OTP is: {$otpCode}. It expires in 5 minutes.";
-        $sent = sendSms($phone, $message);
-
+        $sent = sendMail($email, $pending['name'], $subject, $body);
         if (!$sent) {
-            $_SESSION['error'] = 'Unable to send OTP SMS. Please try again later.';
-            header('Location: /ridemate/views/auth/verify_otp.php');
+            $_SESSION['error'] = 'Unable to send verification email. Please try again later.';
+            header('Location: /ridemate/views/auth/resend_verification.php');
             exit;
         }
 
-        $_SESSION['otp_sent_at'] = time();
-        $_SESSION['otp_resend_at'] = time() + 60;
-        $_SESSION['success'] = 'OTP resent. Please check your phone.';
-        header('Location: /ridemate/views/auth/verify_otp.php');
-        exit;
-    }
-
-    public function verifyOtp() {
-        if ($_SERVER['REQUEST_METHOD'] !== 'POST') return;
-
-        $phone = normalizePhone(trim($_POST['phone'] ?? ''));
-        $otp_code = trim($_POST['otp_code'] ?? '');
-
-        if (empty($phone) || empty($otp_code)) {
-            $_SESSION['error'] = 'Please enter the phone number and OTP.';
-            header('Location: /ridemate/views/auth/verify_otp.php');
-            exit;
-        }
-
-        if (!isValidPhone($phone)) {
-            $_SESSION['error'] = 'Please enter a valid phone number.';
-            header('Location: /ridemate/views/auth/verify_otp.php');
-            exit;
-        }
-
-        $purpose = $_SESSION['otp_purpose'] ?? null;
-        $sessionPhone = $_SESSION['otp_phone'] ?? null;
-        if (!$purpose || $sessionPhone !== $phone) {
-            $_SESSION['error'] = 'OTP session expired. Please start again.';
-            header('Location: /ridemate/views/auth/login.php');
-            exit;
-        }
-
-        if ($purpose === 'register') {
-            if ($this->userModel->verifyOtpForPending($phone, $otp_code)) {
-                unset($_SESSION['otp_phone'], $_SESSION['otp_purpose'], $_SESSION['otp_sent_at'], $_SESSION['otp_resend_at']);
-                $_SESSION['success'] = 'Your account has been verified. Please login.';
-                header('Location: /ridemate/views/auth/login.php');
-                exit;
-            }
-
-            $_SESSION['error'] = 'OTP is invalid, expired, or maximum attempts reached.';
-            header('Location: /ridemate/views/auth/verify_otp.php');
-            exit;
-        }
-
-        if ($purpose === 'login') {
-            if ($this->userModel->verifyOtp($phone, $otp_code)) {
-                $user = $this->userModel->findByPhone($phone);
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['user_name'] = $user['name'];
-                $_SESSION['user_role'] = $user['role'];
-                unset($_SESSION['otp_phone'], $_SESSION['otp_purpose'], $_SESSION['otp_sent_at'], $_SESSION['otp_resend_at']);
-
-                if ($user['role'] === 'admin') {
-                    header('Location: /ridemate/admin/dashboard.php');
-                } else {
-                    header('Location: /ridemate/index.php');
-                }
-                exit;
-            }
-
-            $_SESSION['error'] = 'OTP is invalid, expired, or maximum attempts reached.';
-            header('Location: /ridemate/views/auth/verify_otp.php');
-            exit;
-        }
-
-        if ($purpose === 'forgot_password') {
-            if ($this->userModel->verifyOtp($phone, $otp_code)) {
-                $_SESSION['reset_phone'] = $phone;
-                unset($_SESSION['otp_purpose'], $_SESSION['otp_sent_at'], $_SESSION['otp_resend_at']);
-                header('Location: /ridemate/reset-password.php');
-                exit;
-            }
-
-            $_SESSION['error'] = 'OTP is invalid, expired, or maximum attempts reached.';
-            header('Location: /ridemate/views/auth/verify_otp.php');
-            exit;
-        }
-
-        $_SESSION['error'] = 'Unexpected verification flow. Please try again.';
-        header('Location: /ridemate/views/auth/login.php');
+        $_SESSION['verification_email'] = $email;
+        $_SESSION['verification_resend_at'] = time() + 60;
+        $_SESSION['success'] = 'Verification email resent. Please check your inbox.';
+        header('Location: /ridemate/views/auth/resend_verification.php');
         exit;
     }
 
     public function forgotPasswordRequest() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') return;
 
-        $phone = normalizePhone(trim($_POST['phone'] ?? ''));
-        if (empty($phone) || !isValidPhone($phone)) {
-            $_SESSION['error'] = 'Please enter a valid phone number.';
+        $email = sanitizeEmail(trim($_POST['email'] ?? ''));
+        if (empty($email) || !isValidEmail($email)) {
+            $_SESSION['error'] = 'Please enter a valid email address.';
             header('Location: /ridemate/views/auth/forgot_password.php');
             exit;
         }
 
-        $cooldown = intval($_SESSION['otp_resend_at'] ?? 0);
-        if ($cooldown > time()) {
-            $remaining = $cooldown - time();
-            $_SESSION['error'] = 'Please wait ' . gmdate('i:s', $remaining) . ' before requesting another OTP.';
-            header('Location: /ridemate/views/auth/forgot_password.php');
-            exit;
-        }
-
-        $user = $this->userModel->findByPhone($phone);
+        $user = $this->userModel->findByEmail($email);
         if (!$user) {
-            $_SESSION['error'] = 'Phone number not found.';
+            $_SESSION['error'] = 'Email address not found.';
             header('Location: /ridemate/views/auth/forgot_password.php');
             exit;
         }
 
-        $otpCode = generateOtp();
-        $otpExpires = nowDatetime();
-        $otpExpires = date('Y-m-d H:i:s', strtotime($otpExpires . ' +5 minutes'));
-        if (!$this->userModel->setOtp($phone, $otpCode, $otpExpires)) {
-            $_SESSION['error'] = 'Unable to generate OTP. Please try again.';
+        if (!$user['email_verified']) {
+            $_SESSION['error'] = 'Please verify your email before requesting a password reset.';
             header('Location: /ridemate/views/auth/forgot_password.php');
             exit;
         }
 
-        $message = "Your RideMate password reset OTP is: {$otpCode}. It expires in 5 minutes.";
-        $sent = sendSms($phone, $message);
+        $resetToken = generateToken();
+        $resetExpires = nowDatetime();
+        $resetExpires = date('Y-m-d H:i:s', strtotime($resetExpires . ' +15 minutes'));
+        if (!$this->userModel->requestPasswordReset($email, $resetToken, $resetExpires)) {
+            $_SESSION['error'] = 'Unable to create password reset request. Please try again.';
+            header('Location: /ridemate/views/auth/forgot_password.php');
+            exit;
+        }
 
+        $resetLink = BASE_URL . '/reset-password.php?token=' . urlencode($resetToken);
+        $subject = 'RideMate password reset request';
+        $body = "<p>Hi " . htmlspecialchars($user['name']) . ",</p>" .
+                "<p>We received a request to reset your RideMate password. Click the button below to set a new password:</p>" .
+                "<p><a href='" . $resetLink . "'>Reset my password</a></p>" .
+                "<p>If you did not request this, you can ignore this email. The link expires in 15 minutes.</p>";
+
+        $sent = sendMail($email, $user['name'], $subject, $body);
         if (!$sent) {
-            $_SESSION['error'] = 'Unable to send OTP SMS. Please try again later.';
+            $_SESSION['error'] = 'Unable to send reset email. Please try again later.';
             header('Location: /ridemate/views/auth/forgot_password.php');
             exit;
         }
 
-        $_SESSION['otp_phone'] = $phone;
-        $_SESSION['otp_purpose'] = 'forgot_password';
-        $_SESSION['otp_sent_at'] = time();
-        $_SESSION['otp_resend_at'] = time() + 60;
-
-        header('Location: /ridemate/views/auth/verify_otp.php');
+        $_SESSION['reset_email'] = $email;
+        $_SESSION['password_reset_resend_at'] = time() + 60;
+        $_SESSION['success'] = 'Password reset email has been sent. Please check your inbox.';
+        header('Location: /ridemate/views/auth/forgot_password_status.php');
         exit;
     }
 
     public function resetPassword() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') return;
 
-        $phone = $_SESSION['reset_phone'] ?? null;
+        $token = trim($_POST['reset_token'] ?? '');
         $password = trim($_POST['password'] ?? '');
-        $confirm  = trim($_POST['password_confirm'] ?? '');
+        $confirm = trim($_POST['password_confirm'] ?? '');
 
-        if (empty($phone) || empty($password) || empty($confirm)) {
+        if (empty($token) || empty($password) || empty($confirm)) {
             $_SESSION['error'] = 'All fields are required.';
-            header('Location: /ridemate/reset-password.php');
+            header('Location: /ridemate/reset-password.php?token=' . urlencode($token));
             exit;
         }
 
         if ($password !== $confirm) {
             $_SESSION['error'] = 'Passwords do not match.';
-            header('Location: /ridemate/reset-password.php');
+            header('Location: /ridemate/reset-password.php?token=' . urlencode($token));
             exit;
         }
 
         if (strlen($password) < 6) {
             $_SESSION['error'] = 'Password must be at least 6 characters.';
-            header('Location: /ridemate/reset-password.php');
+            header('Location: /ridemate/reset-password.php?token=' . urlencode($token));
             exit;
         }
 
-        if (!$phone || !isValidPhone($phone)) {
-            $_SESSION['error'] = 'Reset session is invalid. Please request a new OTP.';
+        $resetRequest = $this->userModel->findByResetToken($token);
+        if (!$resetRequest) {
+            $_SESSION['error'] = 'Reset link is invalid or expired. Please request a new one.';
             header('Location: /ridemate/views/auth/forgot_password.php');
             exit;
         }
 
-        $user = $this->userModel->findByPhone($phone);
-        if (!$user) {
-            $_SESSION['error'] = 'User not found.';
-            header('Location: /ridemate/views/auth/forgot_password.php');
-            exit;
-        }
-
-        if ($this->userModel->resetPassword($user['id'], $password)) {
-            unset($_SESSION['reset_phone']);
-            $_SESSION['success'] = 'Password changed successfully. Please login.';
+        if ($this->userModel->resetPasswordByToken($token, $password)) {
+            unset($_SESSION['reset_email']);
+            $_SESSION['success'] = 'Password updated successfully. Please login.';
             header('Location: /ridemate/views/auth/login.php');
             exit;
         }
 
         $_SESSION['error'] = 'Failed to update password. Please try again.';
-        header('Location: /ridemate/reset-password.php');
+        header('Location: /ridemate/reset-password.php?token=' . urlencode($token));
         exit;
     }
 

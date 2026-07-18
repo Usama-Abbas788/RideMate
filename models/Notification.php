@@ -34,11 +34,14 @@ class Notification {
     /**
      * Get notifications for a user.
      */
-    public function getByUser(int $user_id, int $limit = 50): array {
-        $stmt = $this->prepare(
-            "SELECT id, message, type, is_read, created_at FROM notifications
-             WHERE user_id = ? ORDER BY created_at DESC LIMIT ?"
-        );
+    public function getByUser(int $user_id, int $limit = 50, bool $onlyUnread = false): array {
+        $query = "SELECT id, message, type, is_read, created_at FROM notifications WHERE user_id = ?";
+        if ($onlyUnread) {
+            $query .= " AND is_read = 0";
+        }
+        $query .= " ORDER BY created_at DESC LIMIT ?";
+
+        $stmt = $this->prepare($query);
         if ($stmt === false) {
             return [];
         }
@@ -83,6 +86,20 @@ class Notification {
     public function markAllAsRead(int $user_id): bool {
         $stmt = $this->prepare(
             "UPDATE notifications SET is_read = 1 WHERE user_id = ?"
+        );
+        if ($stmt === false) {
+            return false;
+        }
+        $stmt->bind_param('i', $user_id);
+        return $stmt->execute();
+    }
+
+    /**
+     * Delete all notifications for a user.
+     */
+    public function deleteAllByUser(int $user_id): bool {
+        $stmt = $this->prepare(
+            "DELETE FROM notifications WHERE user_id = ?"
         );
         if ($stmt === false) {
             return false;

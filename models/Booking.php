@@ -26,7 +26,7 @@ class Booking {
      * Update booking status: pending | accepted | rejected | cancelled
      */
     public function updateStatus($id, $status) {
-        $allowed = ['pending', 'accepted', 'rejected', 'cancelled'];
+        $allowed = ['pending', 'accepted', 'rejected', 'cancelled', 'closed'];
         if (!in_array($status, $allowed)) return false;
 
         $stmt = $this->conn->prepare("UPDATE bookings SET status = ? WHERE id = ?");
@@ -66,6 +66,21 @@ class Booking {
         $stmt->bind_param("i", $passenger_id);
         $stmt->execute();
         return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+
+    /**
+     * Get a passenger's booking for a specific ride
+     */
+    public function getByRideAndPassenger($ride_id, $passenger_id) {
+        $stmt = $this->conn->prepare(
+            "SELECT b.*
+             FROM bookings b
+             WHERE b.ride_id = ? AND b.passenger_id = ?
+             LIMIT 1"
+        );
+        $stmt->bind_param("ii", $ride_id, $passenger_id);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_assoc();
     }
 
     /**
@@ -126,10 +141,11 @@ class Booking {
 
     public function getAll() {
         $result = $this->conn->query(
-            "SELECT b.*, u.name as passenger_name, r.origin, r.destination, r.date
+            "SELECT b.*, u.name as passenger_name, u.phone as passenger_phone, r.origin, r.destination, r.date, d.name as driver_name, d.phone as driver_phone
              FROM bookings b
              JOIN users u ON b.passenger_id = u.id
              JOIN rides r ON b.ride_id = r.id
+             JOIN users d ON r.driver_id = d.id
              ORDER BY b.created_at DESC"
         );
         return $result->fetch_all(MYSQLI_ASSOC);

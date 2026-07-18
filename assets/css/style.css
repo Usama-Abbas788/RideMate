@@ -692,8 +692,10 @@ select.form-control.dark option { background: white; color: var(--gray-800); }
 
 .badge-pending  { color: #6b7280; }
 .badge-accepted { color: var(--green); }
-.badge-rejected { color: var(--black); }
+.badge-rejected { color: #dc2626 !important; }
 .badge-cancelled{ color: var(--gray-600); }
+.badge-closed   { color: #0f766e; }
+.badge-expired  { color: #9333ea; }
 .badge-driver   { color: var(--green-dark); }
 .badge-passenger{ color: var(--green); }
 .badge-admin    { color: var(--green-dark); }

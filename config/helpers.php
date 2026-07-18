@@ -65,6 +65,20 @@ function isValidPhone(string $phone): bool {
 }
 
 /**
+ * Validate an email address.
+ */
+function isValidEmail(string $email): bool {
+    return filter_var($email, FILTER_VALIDATE_EMAIL) !== false;
+}
+
+/**
+ * Sanitize an email address.
+ */
+function sanitizeEmail(string $email): string {
+    return trim(filter_var($email, FILTER_SANITIZE_EMAIL));
+}
+
+/**
  * Returns the current timestamp with seconds precision.
  */
 function nowDatetime(): string {

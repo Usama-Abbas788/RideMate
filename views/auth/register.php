@@ -62,6 +62,19 @@ $metaDesc  = 'Create your RideMate account and start sharing rides with universi
       </div>
 
       <div class="form-group" style="margin-bottom:1rem;">
+        <label>Email Address</label>
+        <input
+          type="email"
+          name="email"
+          id="reg-email"
+          class="form-control"
+          placeholder="Enter your email address"
+          required
+          autocomplete="email"
+        />
+      </div>
+
+      <div class="form-group" style="margin-bottom:1rem;">
         <label>Phone Number</label>
         <input
           type="tel"

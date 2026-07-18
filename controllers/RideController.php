@@ -47,6 +47,16 @@ class RideController {
                 createNotification($passenger['id'], $message, 'info');
             }
 
+            $admins = $this->userModel->getUsersByRole('admin');
+            foreach ($admins as $admin) {
+                $adminMessage = sprintf(
+                    '%s posted a new ride: %s → %s on %s, %s seats, PKR %s, vehicle %s, driver phone %s.',
+                    $_SESSION['user_name'], $origin, $destination, date('M j, Y g:i A', strtotime($date)),
+                    $seats, number_format($price, 0), ucfirst($vehicle_type), $this->userModel->findById($driver_id)['phone']
+                );
+                createNotification($admin['id'], $adminMessage, 'info');
+            }
+
             $_SESSION['success'] = 'Ride created successfully!';
             header('Location: /ridemate/driver/dashboard.php');
         } else {

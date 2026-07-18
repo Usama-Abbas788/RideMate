@@ -43,11 +43,11 @@ Place the folder in `xampp/htdocs/ridemate`, start Apache + MySQL, visit:
 
 Password for all: `password`
 
-| Role      | Phone         |
-|-----------|---------------|
-| Admin     | `0300-1111111` |
-| Driver    | `0300-2222222` |
-| Passenger | `0300-3333333` |
+| Role      |                         Email/Password                    |
+|-----------|---------------------------------------------------|
+| Admin     | `admin@ridemate.com` / admin123                   |
+| Driver    | `danishriasat792@gmail.com` / 1234567             |
+| Passenger | `fa22-bcs-219@students.cuisahiwal.edu.pk`/ 123456 |
 
 Phone format everywhere: **4 digits – 7 digits** (e.g. `0300-1234567`).
 

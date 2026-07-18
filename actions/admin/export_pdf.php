@@ -140,6 +140,35 @@ class ReportPDF extends FPDF {
         }
         $this->Ln();
     }
+
+    function tableRowMultiLine($cells, $widths, $alt = false) {
+        $this->SetFont('Arial', '', 8);
+        $fill = $alt ? true : false;
+        $this->SetFillColor($alt ? 248 : 255, $alt ? 250 : 255, $alt ? 252 : 255);
+        $this->SetTextColor(50, 50, 50);
+
+        $lineHeight = 6;
+        $maxLines = 1;
+        foreach ($cells as $cell) {
+            $lineCount = substr_count($cell, "\n") + 1;
+            $maxLines = max($maxLines, $lineCount);
+        }
+        $rowHeight = $lineHeight * $maxLines;
+
+        $startX = $this->GetX();
+        $startY = $this->GetY();
+        $x = $startX;
+
+        foreach ($cells as $i => $cell) {
+            $this->SetXY($x, $startY);
+            $text = iconv('UTF-8', 'windows-1252//TRANSLIT//IGNORE', $cell);
+            // Center multiline content in each cell
+            $this->MultiCell($widths[$i], $lineHeight, $text, 1, 'C', $fill);
+            $x += $widths[$i];
+        }
+
+        $this->SetXY($startX, $startY + $rowHeight);
+    }
 }
 
 $pdf = new ReportPDF('P', 'mm', 'A4');
@@ -173,12 +202,15 @@ $pdf->Ln(6);
 if (count($periodRides) > 0) {
     $pdf->sectionTitle('  Rides Posted in This Period');
     $pdf->Ln(2);
-    $cols   = ['#', 'From', 'To', 'Date', 'Seats', 'Price (PKR)', 'Type'];
-    $widths = [10, 40, 40, 30, 16, 26, 22];
+    $cols   = ['#', 'Driver', 'From', 'To', 'Date', 'Seats', 'Price (PKR)', 'Type'];
+    $widths = [10, 40, 30, 30, 25, 12, 20, 23];
     $pdf->tableHeader($cols, $widths);
     foreach (array_slice($periodRides, 0, 30) as $i => $ride) {
-        $pdf->tableRow([
+        $driverName = mb_strimwidth($ride['driver_name'] ?? '-', 0, 24, '..');
+        $driverPhone = mb_strimwidth($ride['driver_phone'] ?? '-', 0, 20, '..');
+        $pdf->tableRowMultiLine([
             $ride['id'] ?? '-',
+            $driverName . "\n" . $driverPhone,
             mb_strimwidth($ride['origin'] ?? '-', 0, 20, '..'),
             mb_strimwidth($ride['destination'] ?? '-', 0, 20, '..'),
             isset($ride['date']) ? date('d M y', strtotime($ride['date'])) : '-',
@@ -194,20 +226,45 @@ if (count($periodRides) > 0) {
 if (count($periodBookings) > 0) {
     $pdf->sectionTitle('  Bookings in This Period');
     $pdf->Ln(2);
-    $cols   = ['#', 'Ride ID', 'Passenger', 'From', 'To', 'Status', 'Date'];
-    $widths = [10, 18, 35, 30, 30, 22, 25];
+    $cols   = ['#', 'Ride ID', 'Passenger', 'Driver', 'Route', 'Departure', 'Status', 'Booking Time'];
+    $widths = [10, 16, 30, 30, 30, 20, 20, 24];
     $pdf->tableHeader($cols, $widths);
     foreach (array_slice($periodBookings, 0, 30) as $i => $b) {
-        $pdf->tableRow([
+        $route = mb_strimwidth($b['origin'] ?? '-', 0, 18, '..')
+            . "\n|\n"
+            . mb_strimwidth($b['destination'] ?? '-', 0, 18, '..');
+        $time  = isset($b['date']) ? date('d M Y', strtotime($b['date'])) . "\n" . date('H:i', strtotime($b['date'])) : '-';
+        $pdf->tableRowMultiLine([
             $b['id'] ?? '-',
             $b['ride_id'] ?? '-',
-            mb_strimwidth($b['passenger_name'] ?? '-', 0, 20, '..'),
-            mb_strimwidth($b['origin'] ?? '-', 0, 18, '..'),
-            mb_strimwidth($b['destination'] ?? '-', 0, 18, '..'),
+            mb_strimwidth($b['passenger_name'] ?? '-', 0, 20, '..') . "\n" . mb_strimwidth($b['passenger_phone'] ?? '-', 0, 20, '..'),
+            mb_strimwidth($b['driver_name'] ?? '-', 0, 20, '..') . "\n" . mb_strimwidth($b['driver_phone'] ?? '-', 0, 20, '..'),
+            $route,
+            $time,
             ucfirst($b['status'] ?? '-'),
-            isset($b['created_at']) ? date('d M y', strtotime($b['created_at'])) : '-',
+            isset($b['created_at']) ? date('d M y H:i', strtotime($b['created_at'])) : '-',
         ], $widths, $i % 2 === 1);
     }
+    $pdf->Ln(6);
+
+    // $pdf->sectionTitle('  Booking Details');
+    // $pdf->Ln(2);
+    // foreach (array_slice($periodBookings, 0, 20) as $b) {
+    //     $details = sprintf('Booking #%s: ride %s → %s on %s. Status: %s. Passenger: %s / %s. Driver: %s / %s.',
+    //         $b['id'] ?? '-',
+    //         $b['origin'] ?? '-',
+    //         $b['destination'] ?? '-',
+    //         isset($b['date']) ? date('d M Y H:i', strtotime($b['date'])) : '-',
+    //         ucfirst($b['status'] ?? '-'),
+    //         $b['passenger_name'] ?? '-',
+    //         $b['passenger_phone'] ?? '-',
+    //         $b['driver_name'] ?? '-',
+    //         $b['driver_phone'] ?? '-'
+    //     );
+    //     $pdf->SetFont('Arial', '', 9);
+    //     $pdf->MultiCell(0, 6, iconv('UTF-8', 'windows-1252//TRANSLIT//IGNORE', $details), 0, 'L');
+    //     $pdf->Ln(1);
+    // }
 }
 
 // --- Output PDF ---

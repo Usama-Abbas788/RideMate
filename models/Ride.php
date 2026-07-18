@@ -111,7 +111,7 @@ class Ride {
 
     public function getAll() {
         $result = $this->conn->query(
-            "SELECT r.*, u.name as driver_name
+            "SELECT r.*, u.name as driver_name, u.phone as driver_phone
              FROM rides r JOIN users u ON r.driver_id = u.id
              ORDER BY r.created_at DESC"
         );

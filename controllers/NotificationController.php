@@ -8,8 +8,8 @@ class NotificationController {
         $this->notificationModel = new Notification($conn);
     }
 
-    public function fetchForUser(int $user_id): array {
-        return $this->notificationModel->getByUser($user_id);
+    public function fetchForUser(int $user_id, bool $onlyUnread = false): array {
+        return $this->notificationModel->getByUser($user_id, 50, $onlyUnread);
     }
 
     public function markRead(int $notification_id, int $user_id): bool {
@@ -18,6 +18,10 @@ class NotificationController {
 
     public function markAllRead(int $user_id): bool {
         return $this->notificationModel->markAllAsRead($user_id);
+    }
+
+    public function deleteAll(int $user_id): bool {
+        return $this->notificationModel->deleteAllByUser($user_id);
     }
 
     public function countUnread(int $user_id): int {

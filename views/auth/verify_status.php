@@ -1,16 +1,18 @@
 <?php
 session_start();
-if (isset($_SESSION['otp_phone']) && isset($_SESSION['otp_purpose'])) {
-    header('Location: /ridemate/views/auth/verify_otp.php');
+
+$email = $_SESSION['verification_email'] ?? null;
+$remainingCooldown = max(0, intval($_SESSION['verification_resend_at'] ?? 0) - time());
+
+if (!$email) {
+    header('Location: /ridemate/views/auth/login.php');
     exit;
 }
 
-header('Location: /ridemate/views/auth/login.php');
-exit;
-
 $pageTitle = 'Verify Your Email';
-$metaDesc  = 'Please verify your email address to active your RideMate account.';
+$metaDesc  = 'Please verify your email address to activate your RideMate account.';
 ?>
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
