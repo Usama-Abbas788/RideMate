@@ -38,8 +38,8 @@ require_once __DIR__ . '/layouts/header.php';
         <h1 class="page-title">Notifications</h1>
         <p class="page-subtitle">Manage your recent RideMate alerts.</p>
       </div>
-      <form action="/ridemate/actions/notification_mark_all.php" method="POST" style="margin:0; margin-right:1rem;" onsubmit="return confirm('Clear all notifications for this account?');">
-        <button type="submit" class="btn btn-danger">Clear</button>
+      <form action="/ridemate/actions/notification_mark_all.php" method="POST" style="margin:0; margin-right:1rem;">
+        <button type="submit" class="btn btn-danger fixed-clear-btn" data-confirm="Clear all notifications for this account?">Clear All</button>
       </form>
     </div>
 

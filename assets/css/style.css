@@ -1528,4 +1528,11 @@ input[type="file"] {
   margin-bottom: 1.5rem;
   line-height: 1.5;
 }
+.fixed-clear-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 999;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+}
 

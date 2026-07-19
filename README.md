@@ -254,14 +254,14 @@ You can use the pre-configured accounts below to log in and test different syste
 | **Passenger** | `fa22-bcs-219@students.cuisahiwal.edu.pk` | `123456` | Search and book rides, cancel requests, track booking histories. |
 
 > [!NOTE]
-> All users must conform to the required phone number format: **`0300-1234567`** (4 digits - 7 digits).
+> All users must conform to the required phone number format: **`03001234567`** (Not more than 11 digits).
 
 To insert these demo users directly into your database, run:
 ```sql
 INSERT INTO `users` (`id`, `name`, `email`, `phone`, `password`, `role`, `email_verified`) VALUES
-(1, 'Admin User', 'admin@ridemate.com', '0300-1111111', '$2y$10$GIJd2fnDr2MDWqrWEA01Du3LVSAon1ipOLiZnfW2c8GToQEHVwX7q', 'admin', 1),
-(2, 'Driver User', 'danishriasat792@gmail.com', '0300-2222222', '$2y$10$eO3MNmgPNX0cWlt4SroCaeyLz20hM7P/u/UqcJTSgceSM5N65j.Ry', 'driver', 1),
-(3, 'Passenger User', 'fa22-bcs-219@students.cuisahiwal.edu.pk', '0300-3333333', '$2y$10$wYINnU/rKi2IQP9dhO9nKOo2tmwpi9u2ZeiLm2mpVfR3rNOkv/mGK', 'passenger', 1);
+(1, 'Admin User', 'admin@ridemate.com', '03001111111', '$2y$10$GIJd2fnDr2MDWqrWEA01Du3LVSAon1ipOLiZnfW2c8GToQEHVwX7q', 'admin', 1),
+(2, 'Driver User', 'danishriasat792@gmail.com', '03002222222', '$2y$10$eO3MNmgPNX0cWlt4SroCaeyLz20hM7P/u/UqcJTSgceSM5N65j.Ry', 'driver', 1),
+(3, 'Passenger User', 'fa22-bcs-219@students.cuisahiwal.edu.pk', '03003333333', '$2y$10$wYINnU/rKi2IQP9dhO9nKOo2tmwpi9u2ZeiLm2mpVfR3rNOkv/mGK', 'passenger', 1);
 ```
 
 ---

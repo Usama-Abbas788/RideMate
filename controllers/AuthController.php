@@ -118,7 +118,7 @@ class AuthController {
         }
 
         $_SESSION['verification_email'] = $email;
-        $_SESSION['verification_resend_at'] = time() + 60;
+        $_SESSION['verification_resend_at'] = time() + 120;
         $_SESSION['success'] = 'A verification email has been sent. Please check your inbox.';
 
         header('Location: /ridemate/views/auth/verify_status.php');
@@ -167,7 +167,7 @@ class AuthController {
         }
 
         $_SESSION['verification_email'] = $email;
-        $_SESSION['verification_resend_at'] = time() + 60;
+        $_SESSION['verification_resend_at'] = time() + 120;
         $_SESSION['success'] = 'Verification email resent. Please check your inbox.';
         header('Location: /ridemate/views/auth/resend_verification.php');
         exit;
@@ -220,7 +220,7 @@ class AuthController {
         }
 
         $_SESSION['reset_email'] = $email;
-        $_SESSION['password_reset_resend_at'] = time() + 60;
+        $_SESSION['password_reset_resend_at'] = time() + 120;
         $_SESSION['success'] = 'Password reset email has been sent. Please check your inbox.';
         header('Location: /ridemate/views/auth/forgot_password_status.php');
         exit;
