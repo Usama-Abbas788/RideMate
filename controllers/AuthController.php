@@ -13,7 +13,7 @@ class AuthController {
     public function login() {
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') return;
 
-        $email = sanitizeEmail(trim($_POST['email'] ?? ''));
+        $email    = sanitizeEmail(trim($_POST['email'] ?? ''));
         $password = trim($_POST['password'] ?? '');
 
         if (empty($email) || empty($password)) {
@@ -28,28 +28,121 @@ class AuthController {
             exit;
         }
 
+        // --- Check verified users table first ---
         $user = $this->userModel->findByEmail($email);
-        if (!$user || !password_verify($password, $user['password'])) {
-            $_SESSION['error'] = 'Invalid email or password.';
+        if ($user) {
+            if (!password_verify($password, $user['password'])) {
+                $_SESSION['error'] = 'Invalid email or password.';
+                header('Location: /ridemate/views/auth/login.php');
+                exit;
+            }
+
+            // Account exists in users table but email_verified = 0 (edge case)
+            if (!$user['email_verified']) {
+                $_SESSION['needs_verification'] = true;
+                $_SESSION['unverified_email']   = $email;
+                header('Location: /ridemate/views/auth/login.php');
+                exit;
+            }
+
+            // All good — log in
+            $_SESSION['user_id']   = $user['id'];
+            $_SESSION['user_name'] = $user['name'];
+            $_SESSION['user_role'] = $user['role'];
+
+            if ($user['role'] === 'admin') {
+                header('Location: /ridemate/admin/dashboard.php');
+            } else {
+                header('Location: /ridemate/index.php');
+            }
+            exit;
+        }
+
+        // --- Not in users table — check pending_registrations ---
+        $pending = $this->userModel->findPendingByEmail($email);
+        if ($pending && password_verify($password, $pending['password'])) {
+            // Correct credentials but not yet verified
+            $_SESSION['needs_verification'] = true;
+            $_SESSION['unverified_email']   = $email;
             header('Location: /ridemate/views/auth/login.php');
             exit;
         }
 
-        if (!$user['email_verified']) {
-            $_SESSION['error'] = 'Please verify your email address before logging in.';
-            header('Location: /ridemate/views/auth/login.php');
+        // Not found in either table, or wrong password
+        $_SESSION['error'] = 'Invalid email or password.';
+        header('Location: /ridemate/views/auth/login.php');
+        exit;
+    }
+
+    /**
+     * AJAX endpoint: resend verification email.
+     * Outputs JSON {success, message} and exits.
+     */
+    public function resendVerificationAjax() {
+        header('Content-Type: application/json');
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'message' => 'Invalid request method.']);
             exit;
         }
 
-        $_SESSION['user_id'] = $user['id'];
-        $_SESSION['user_name'] = $user['name'];
-        $_SESSION['user_role'] = $user['role'];
-
-        if ($user['role'] === 'admin') {
-            header('Location: /ridemate/admin/dashboard.php');
-        } else {
-            header('Location: /ridemate/index.php');
+        $email = sanitizeEmail(trim($_POST['email'] ?? ''));
+        if (empty($email) || !isValidEmail($email)) {
+            echo json_encode(['success' => false, 'message' => 'Invalid email address.']);
+            exit;
         }
+
+        $pending = $this->userModel->findPendingByEmail($email);
+        if (!$pending) {
+            // Could be an edge-case user in the users table with email_verified=0
+            $user = $this->userModel->findByEmail($email);
+            if (!$user || $user['email_verified']) {
+                echo json_encode(['success' => false, 'message' => 'No pending registration found for that email.']);
+                exit;
+            }
+            // For this edge case we can't easily re-send without a pending row;
+            // inform the user to contact support.
+            echo json_encode(['success' => false, 'message' => 'Unable to resend. Please contact support.']);
+            exit;
+        }
+
+        // Cooldown guard — prevent spam (2-minute window stored in session)
+        $cooldownKey = 'resend_cooldown_' . md5($email);
+        if (!empty($_SESSION[$cooldownKey]) && $_SESSION[$cooldownKey] > time()) {
+            $wait = $_SESSION[$cooldownKey] - time();
+            echo json_encode(['success' => false, 'message' => 'Please wait ' . $wait . ' seconds before resending.']);
+            exit;
+        }
+
+        $verificationToken   = generateToken();
+        $verificationExpires = date('Y-m-d H:i:s', strtotime('+15 minutes'));
+
+        if (!$this->userModel->updatePendingVerificationToken($email, $verificationToken, $verificationExpires)) {
+            echo json_encode(['success' => false, 'message' => 'Could not refresh verification link. Please try again.']);
+            exit;
+        }
+
+        $verificationLink = BASE_URL . '/verify.php?token=' . urlencode($verificationToken);
+        $subject = 'Your RideMate verification link';
+        $body    = "<p>Hi " . htmlspecialchars($pending['name']) . ",</p>" .
+                   "<p>Use the link below to verify your RideMate email address:</p>" .
+                   "<p><a href='" . $verificationLink . "'>Verify my email</a></p>" .
+                   "<p>If the button does not work, paste this URL into your browser:</p>" .
+                   "<p>" . htmlspecialchars($verificationLink) . "</p>" .
+                   "<p>This link expires in 15 minutes.</p>";
+
+        $sent = sendMail($email, $pending['name'], $subject, $body);
+        if (!$sent) {
+            echo json_encode(['success' => false, 'message' => 'Failed to send email. Please try again later.']);
+            exit;
+        }
+
+        // Set cooldown
+        $_SESSION[$cooldownKey]          = time() + 120;
+        $_SESSION['verification_email']  = $email;
+        $_SESSION['verification_resend_at'] = time() + 120;
+
+        echo json_encode(['success' => true, 'message' => 'Verification email sent! Please check your inbox.']);
         exit;
     }
 

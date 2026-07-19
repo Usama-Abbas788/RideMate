@@ -68,7 +68,7 @@ RideMate/
 │   ├── forgot_password.php          # Triggers SMTP reset password token generation
 │   ├── login.php                    # Authenticates users and initiates sessions
 │   ├── logout.php                   # Destroys active user sessions
-│   ├── notification_mark_all.php    # Marks all user notifications as read
+│   ├── notification_delete_all.php    # Marks all user notifications as read
 │   ├── notification_mark_read.php   # Marks a single notification as read
 │   ├── register.php                 # Submits registration into pending validation
 │   ├── resend_otp.php               # Refreshes OTP (legacy logic fallback)
