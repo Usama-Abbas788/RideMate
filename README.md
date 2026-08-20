@@ -1,4 +1,4 @@
-# RideMate — University Ride Sharing System
+# RideMate - University Ride Sharing System
 
 RideMate is a smart campus ride-sharing platform tailored for university students. It enables drivers (students offering rides) and passengers (students seeking rides) to connect, split travel costs, optimize their commutes, and reduce campus traffic.
 
